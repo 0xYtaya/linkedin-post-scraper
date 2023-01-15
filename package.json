@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "input": "^1.0.1",
+    "linvo-scraper": "^1.0.5",
+    "ora": "^6.1.2",
+    "puppeteer": "^19.5.2"
+  },
+  "type": "module"
+}
