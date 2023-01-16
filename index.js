@@ -11,9 +11,10 @@ async function sleep(ms) {
 }
 
 (async () => {
-    let email = await input.text("Enter you username:");
+    let email = await input.text("Enter you email:");
     let password = await input.password("Enter you password:");
     let n = await input.text("Enter number of post you want to scrape:");
+    let url_post = await input.text("Enter url of post:");
 
     const browser = await puppeteer.launch({
         headless: false,
@@ -30,9 +31,9 @@ async function sleep(ms) {
 
     // add ghost-cursor for maximum safety
     await LinvoScraper.tools.loadCursor(page, true);
-    let spinner =  ora('Loging').start();
+    let spinner = ora('Loging').start();
 
-    const {token} = await LinvoScraper.services.login.process(page, cdp, {
+    const { token } = await LinvoScraper.services.login.process(page, cdp, {
         user: email,
         password: password
     })
@@ -47,9 +48,9 @@ async function sleep(ms) {
         domain: ".www.linkedin.com",
     });
     spinner.stop()
-    await page.goto('https://www.linkedin.com/search/results/content/?keywords=react%20js&origin=SWITCH_SEARCH_VERTICAL&sid=-UV', { timeout: 0, waitUntil: 'networkidle2' });
+    await page.goto(url_post, { timeout: 0, waitUntil: 'networkidle2' });
     await page.waitForSelector(".reusable-search__entity-result-list > div");
-    spinner =  ora('Scrooling for lodoing data').start();
+    spinner = ora('Scrooling for lodoing data').start();
     let ret = await page.evaluate(async (n) => {
         let res = await new Promise((resolve, reject) => {
             var totalHeight = 0;
@@ -65,9 +66,9 @@ async function sleep(ms) {
                     resolve(Array.from(result).map((el) => "https://www.linkedin.com/feed/update/" + el.getAttribute("data-urn")));
                 }
             }, 500);
-        },[Number(n)]);
+        }, [Number(n)]);
         return res;
-    },[Number(n)]);
+    }, [Number(n)]);
     spinner.stop()
     ret = ret.filter((el) => !el.includes("null"));
     let data = [];
@@ -127,8 +128,42 @@ async function sleep(ms) {
             })
         }
         catch (err) { }
+        let likes = [];
+        try {
+            await page.waitForSelector(".social-details-social-counts__reactions-count", { timeout: 10000 });
+            await page.click(".social-details-social-counts__reactions-count", { clickCount: 2 });
+            await page.waitForSelector(".artdeco-modal__content");
+            await page.evaluate(async () => {
+                await new Promise((resolve, reject) => {
+                    var totalHeight = 0;
+                    var distance = 100;
+                    var timer = setInterval(() => {
+                        let max = document.querySelector(".artdeco-modal__content").scrollHeight;
+                        document.querySelector(".artdeco-modal__content").scrollBy(0, distance);
+                        totalHeight += distance;
+                        if (totalHeight >= max) {
+                            clearInterval(timer);
+                            resolve()
+                        }
+                    }, 500);
+                });
+            });
+            await sleep(10000);
+            let likes_links = await page.$$(".social-details-reactors-tab-body-list-item");
+            for (const like of likes_links) {
+                try {
+                    let name = await like.$eval(".inline-flex > a", el => el?.querySelector(".artdeco-entity-lockup__title > span")?.innerText);
+                    let profile = await like.$eval(".inline-flex > a", el => el?.getAttribute("href"));
+                    likes.push({ name, profile });
+                }
+                catch (err) { }
+            }
+        }
+        catch {
+            // console.log("No likes");
+        }
         spinner.stop()
-        data.push({ "post": { post_url: link, name: actorName, p_url: actorprofileurl, content: content, src: src, comments: comments } });
+        data.push({ "post": { post_url: link, name: actorName, p_url: actorprofileurl, content: content, src: src, comments: comments, likes: likes } });
         spinner = ora('Waiting for 10 seconds').start();
         await sleep(1000 * 10);
         spinner.stop()
