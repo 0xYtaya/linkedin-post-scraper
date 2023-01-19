@@ -17,6 +17,7 @@ async function sleep(ms) {
     let url_post = await input.text("Enter url of post:");
 
     const browser = await puppeteer.launch({
+        executablePath : '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
         headless: false,
         defaultViewport: null,
     });
